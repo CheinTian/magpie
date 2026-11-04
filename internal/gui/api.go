@@ -1011,7 +1011,7 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 		s := settings.Load()
 		// and the text size, which the Mac's header measures against the
 		// traffic lights
-		boot := map[string]any{"lang": s.Lang, "theme": s.Theme, "textSize": s.TextSize, "web": isWeb(w)}
+		boot := map[string]any{"lang": s.Lang, "theme": s.Theme, "textSize": s.TextSize, "pluginPageSize": s.PluginPageSize, "web": isWeb(w)}
 		// and the version that served the page: a browser's page reloads
 		// once another answers in its place (visamzh on X), as after its
 		// own restart to update (backAsNew)

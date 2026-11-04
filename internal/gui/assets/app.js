@@ -19080,6 +19080,7 @@ const CURRENCIES = [["usd", "$ USD"], ["cny", "¥ CNY"]];
 // as at 100%, and magpie sizes the windows around it (textsize.go). None is
 // under 100%: WebView2 and WebKitGTK zoom no smaller through Wails.
 const TEXT_SIZES = [100, 110, 125, 150];
+const PLUGIN_PAGE_SIZES = [12, 24, 36, 60];
 const textSizeKeys = () => /^Mac/.test(navigator.platform) ? "⌘+ ⌘− ⌘0" : "Ctrl+ Ctrl− Ctrl+0";
 // --zoom is the text size for what is placed against the window's own
 // drawing, which does not grow with the page: the Mac's traffic lights.
@@ -19754,6 +19755,7 @@ function renderSettings() {
   // the keys that do it too, in the choices' tooltip
   $("#textSizeSegs").title = t("Everything in magpie's windows, larger; {keys} too", { keys: textSizeKeys() });
   $("#textSizeSegs").replaceChildren(segs(TEXT_SIZES.map((n) => [n, n + "%"]), s.textSize || 100, (n) => setTextSize(n)));
+  $("#pluginPageSizeSegs").replaceChildren(segs(PLUGIN_PAGE_SIZES.map((n) => [n, String(n)]), s.pluginPageSize || 12, (n) => savePrefs({ ...keep, pluginPageSize: +n })));
   $("#traySegs").replaceChildren(segs(TRAYS.map(([id, name]) => [id, t(name)]), s.tray || "panel", (tray) => savePrefs({ ...keep, tray })));
   renderPanelKey(s);
   // the Dock is the Mac's; the tray and the login item the app's
@@ -22503,7 +22505,7 @@ function dockChoice(s) {
 function prefsKeep(s) {
   return { theme: s.theme, colorblind: !!s.colorblind, reduceMotion: !!s.reduceMotion, noBird: !!s.noBird, lang: s.lang, tray: s.tray, dock: !!s.dock, dockWindow: !!s.dockWindow, dockNever: !!s.dockNever, lightweight: s.lightweight, keepAwake: !!s.keepAwake, keepAwakeDisplay: !!s.keepAwakeDisplay, noWSLAgents: !!s.noWSLAgents, quitNoAsk: !!s.quitNoAsk, proxy: s.proxy || "",
     sessionTerminal: s.sessionTerminal || "",
-    uiFont: s.uiFont || null, codeFont: s.codeFont || null,
+    uiFont: s.uiFont || null, codeFont: s.codeFont || null, pluginPageSize: s.pluginPageSize || 12,
     otel: s.otel || {},
     trayUsages: s.trayUsages || [],
     redact: !!s.redact, redactPersonal: !!s.redactPersonal, redactKinds: s.redactKinds || {}, redactWords: s.redactWords || [], redactWordsAnyCase: !!s.redactWordsAnyCase, redactWordsWhole: !!s.redactWordsWhole, redactShape: !!s.redactShape, codexWarmup: s.codexWarmup || "",

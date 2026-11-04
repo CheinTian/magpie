@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -46,6 +47,12 @@ func sample(t reflect.Type, key string, was reflect.Value) reflect.Value {
 		v.SetString(s)
 	case reflect.Int, reflect.Int64, reflect.Int32:
 		v.SetInt(was.Int() + 7)
+		for _, c := range Choices[key] {
+			if n, err := strconv.Atoi(c); err == nil && int64(n) != was.Int() {
+				v.SetInt(int64(n))
+				break
+			}
+		}
 	case reflect.Float64, reflect.Float32:
 		v.SetFloat(was.Float() + 1.5)
 	case reflect.Pointer:

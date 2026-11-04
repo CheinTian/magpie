@@ -34,6 +34,8 @@
   let checking = false;  // Check for updates: npm being asked now
   let checked = null;    // ...and what it said: { at, by: spec → check }
   let shown = "";
+  const pageByKey = new Map(); // a Discover list's page, zero-based
+  let pageSizeAt = 0;
 
   const SEARCH = "M7 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M10 10l3 3";
   const DOWN = "M8 3v7.5 M4.8 7.6 8 10.8l3.2-3.2 M3.5 13h9";
@@ -252,6 +254,7 @@
   window.pluginQuery = (q) => {
     query = q;
     tab = "discover";
+    pageByKey.clear();
     clearTimeout(searchTimer);
     hits = q.trim().length >= 2 ? { q: q.trim(), loading: true } : null;
     if (hits) searchNPM(hits.q);
@@ -266,6 +269,7 @@
   window.pluginAgentsTo = (ev) => {
     query = "";
     tab = "discover";
+    pageByKey.clear();
     clearTimeout(searchTimer);
     hits = null;
     agentsFor = ev;
@@ -634,14 +638,60 @@
     return g;
   }
 
-  function section(title, hint, list) {
+  function pluginPageSize() {
+    const n = Number(state?.settings?.pluginPageSize || window.bootPrefs?.pluginPageSize) || 12;
+    return [12, 24, 36, 60].includes(n) ? n : 12;
+  }
+  function paginate(list, key) {
+    const size = pluginPageSize();
+    if (size !== pageSizeAt) {
+      pageByKey.clear();
+      pageSizeAt = size;
+    }
+    const pages = Math.max(1, Math.ceil(list.length / size));
+    const page = Math.min(pageByKey.get(key) || 0, pages - 1);
+    pageByKey.set(key, page);
+    return { items: list.slice(page * size, (page + 1) * size), page, pages };
+  }
+  // The pager belongs to its section: moving to another page leaves the
+  // reader at that section's head rather than at the button under the list.
+  function pager(key, paged, redraw) {
+    if (paged.pages < 2) return null;
+    const box = el("nav", "pm-pager");
+    box.setAttribute("aria-label", t("Plugin pages"));
+    const prev = el("button", "text", t("Previous page"));
+    prev.type = "button";
+    prev.disabled = paged.page === 0;
+    const next = el("button", "text", t("Next page"));
+    next.type = "button";
+    next.disabled = paged.page === paged.pages - 1;
+    const go = (ev, to) => {
+      const scroll = scrollOnPurpose(ev);
+      pageByKey.set(key, to);
+      redraw();
+      if (scroll) requestAnimationFrame(() => {
+        body?.querySelector(`[data-page-key="${key}"]`)?.scrollIntoView({ block: "start" });
+        window.arrived?.(page);
+      });
+    };
+    prev.onclick = (ev) => go(ev, paged.page - 1);
+    next.onclick = (ev) => go(ev, paged.page + 1);
+    box.append(prev, el("span", "", t("Page {page} of {pages}", { page: paged.page + 1, pages: paged.pages })), next);
+    return box;
+  }
+
+  function section(title, hint, list, key) {
     const box = el("section", "pm-sec");
+    box.dataset.pageKey = key;
     const h = el("div", "pm-sechead");
     h.append(el("h3", "", title));
     if (hint) h.append(el("span", "", hint));
     const g = el("div", "pm-grid");
-    for (const l of list) g.append(card(l));
+    const paged = paginate(list, key);
+    for (const l of paged.items) g.append(card(l));
     box.append(h, g);
+    const p = pager(key, paged, drawBody);
+    if (p) box.append(p);
     return box;
   }
 
@@ -652,6 +702,7 @@
   let ghQuery = "";
   let ghList = [];       // what the page's search left of the repositories
   const ghSec = el("section", "pm-sec pm-ghsec");
+  ghSec.dataset.pageKey = "github";
   const ghHead = el("div", "pm-sechead");
   const ghBar = el("div", "pm-ghbar");
   const ghGrid = el("div", "pm-grid");
@@ -660,7 +711,7 @@
   ghQ.type = "search";
   ghQ.spellcheck = false;
   ghQ.autocomplete = "off";
-  ghQ.oninput = () => { ghQuery = ghQ.value; drawGh(); };
+  ghQ.oninput = () => { ghQuery = ghQ.value; pageByKey.delete("github"); drawGh(); };
   ghQ.onkeydown = (ev) => { ev.stopPropagation(); if (ev.key === "Escape" && ghQ.value) { ghQ.value = ""; ghQ.oninput(); } };
   ghFind.append(glyph(SEARCH, 13, 1.6), ghQ);
   const ghMatch = (l) => {
@@ -766,7 +817,7 @@
     const n = (k, h) => found.filter((l) => (!k || kindOf(l) === k) && (!h || have(l) === (h === "have"))).length;
     const bar = [];
     if (kinds.length > 1) {
-      const pick = segs([["", t("All") + " · " + n("", ghHave)], ...kinds.map((k) => [k, t(KINDS[k][1]) + " · " + n(k, ghHave)])], ghKind, (k) => { ghKind = k; drawGh(); });
+      const pick = segs([["", t("All") + " · " + n("", ghHave)], ...kinds.map((k) => [k, t(KINDS[k][1]) + " · " + n(k, ghHave)])], ghKind, (k) => { ghKind = k; pageByKey.delete("github"); drawGh(); });
       pick.classList.add("pm-ghkinds");
       pick.setAttribute("role", "group");
       pick.setAttribute("aria-label", t("Kind of plugin"));
@@ -775,7 +826,7 @@
     // what's installed, on both sides of it: a reader looks for what to
     // add as much as for what they have
     if (both) {
-      const pick = segs([["", t("All")], ["have", t("Installed") + " · " + n(ghKind, "have")], ["none", t("Not installed") + " · " + n(ghKind, "none")]], ghHave, (h) => { ghHave = h; drawGh(); });
+      const pick = segs([["", t("All")], ["have", t("Installed") + " · " + n(ghKind, "have")], ["none", t("Not installed") + " · " + n(ghKind, "none")]], ghHave, (h) => { ghHave = h; pageByKey.delete("github"); drawGh(); });
       pick.classList.add("pm-ghhave");
       pick.setAttribute("role", "group");
       pick.setAttribute("aria-label", t("Installed or not"));
@@ -788,14 +839,16 @@
     replaceKeeping(ghBar, bar);
     const shown = found.filter((l) => (!ghKind || kindOf(l) === ghKind) && (!ghHave || have(l) === (ghHave === "have")));
     if (shown.length) {
-      ghGrid.replaceChildren(...shown.map(card));
-      replaceKeeping(ghSec, [...head, ghBar, ghGrid]);
+      const paged = paginate(shown, "github");
+      ghGrid.replaceChildren(...paged.items.map(card));
+      const p = pager("github", paged, drawGh);
+      replaceKeeping(ghSec, [...head, ghBar, ghGrid, ...(p ? [p] : [])]);
       return;
     }
     const none = el("div", "pm-ghnone");
     const all = el("button", "text", t("Show all"));
     all.type = "button";
-    all.onclick = () => { ghKind = ""; ghHave = ""; ghQuery = ""; drawGh(); ghQ.focus(); };
+    all.onclick = () => { ghKind = ""; ghHave = ""; ghQuery = ""; pageByKey.delete("github"); drawGh(); ghQ.focus(); };
     none.append(el("span", "", t("No plugin on GitHub matches")), all);
     replaceKeeping(ghSec, [...head, ghBar, none]);
   }
@@ -811,6 +864,7 @@
   q.autocomplete = "off";
   q.oninput = () => {
     query = q.value;
+    pageByKey.clear();
     if (tab !== "discover") { tab = "discover"; draw(); }
     clearTimeout(searchTimer);
     const s = query.trim();
@@ -828,6 +882,7 @@
     const n = mine?.plugins?.length || 0;
     const tabs = segs([["builtin", t("Built-in")], ["discover", t("Discover")], ["installed", t("Installed") + (n ? " · " + n : "")]], tab, (id) => {
       tab = id;
+      pageByKey.clear();
       try { localStorage.setItem("magpie.pluginTab", id); } catch {}
       searchShown();
       drawBody();
@@ -944,12 +999,12 @@
       const ags = ls.filter((l) => l.community && kindOf(l) === "ag");
       const tls = ls.filter((l) => l.community && kindOf(l) === "tl");
       const pgs = ls.filter((l) => l.community && kindOf(l) === "pg");
-      if (ours.length) out.push(section(t("Subscriptions"), t("written for magpie, checked against its own sign-ins"), ours));
-      if (mws.length) out.push(section(t("Gateway middleware"), t("runs in magpie's gateway on what every agent sends and gets back, whichever provider serves it"), mws));
-      const agSec = ags.length ? section(t("Agents"), t("agents magpie has no setup of its own for, connected to it as its own are"), ags) : null;
+      if (ours.length) out.push(section(t("Subscriptions"), t("written for magpie, checked against its own sign-ins"), ours, "subs"));
+      if (mws.length) out.push(section(t("Gateway middleware"), t("runs in magpie's gateway on what every agent sends and gets back, whichever provider serves it"), mws, "mw"));
+      const agSec = ags.length ? section(t("Agents"), t("agents magpie has no setup of its own for, connected to it as its own are"), ags, "agents") : null;
       if (agSec) { agSec.classList.add("pm-agents"); out.push(agSec); }
-      if (tls.length) out.push(section(t("Tools for agents"), t("tools every agent can call, through magpie's MCP server"), tls));
-      if (pgs.length) out.push(section(t("Pages"), t("pages of their own in magpie's window, each shut off from the rest and reading only what it lists"), pgs));
+      if (tls.length) out.push(section(t("Tools for agents"), t("tools every agent can call, through magpie's MCP server"), tls, "tools"));
+      if (pgs.length) out.push(section(t("Pages"), t("pages of their own in magpie's window, each shut off from the rest and reading only what it lists"), pgs, "pages"));
       if (gh.length) out.push(ghSection(gh));
       else if (!tagged) out.push(ghWaiting());
       else if (taggedErr && !tagged.length) out.push(ghFailed());
@@ -968,7 +1023,7 @@
       }
       return;
     }
-    if (ls.length) out.push(section(t("Suggested"), "", ls));
+    if (ls.length) out.push(section(t("Suggested"), "", ls, "suggested"));
     if (gh.length) out.push(ghSection(gh));
     else if (!tagged) out.push(ghWaiting());
     else if (taggedErr && !tagged.length) out.push(ghFailed());
@@ -977,6 +1032,7 @@
     // only names it (#3685)
     const known = new Set([...listings.map((l) => l.package), ...(tagged || []).map((l) => l.package)]);
     const box = el("section", "pm-sec");
+    box.dataset.pageKey = "npm";
     const h = el("div", "pm-sechead");
     h.append(el("h3", "", t("On npm")), el("span", "", t("OpenCode plugins and pi packages anyone published — read what one does before you install it")));
     box.append(h);
@@ -987,8 +1043,11 @@
       const list = hits.list.filter((x) => !known.has(x.package));
       if (!list.length) box.append(el("p", "pm-note", ls.length ? t("Nothing else on npm") : t("No plugin called “{q}”", { q: query.trim() })));
       const g = el("div", "pm-grid");
-      for (const x of list) g.append(card({ package: x.package, name: x.package, npm: x }));
+      const paged = paginate(list, "npm");
+      for (const x of paged.items) g.append(card({ package: x.package, name: x.package, npm: x }));
       box.append(g);
+      const p = pager("npm", paged, drawBody);
+      if (p) box.append(p);
     }
     out.push(box);
     replaceKeeping(body, out);

@@ -536,3 +536,18 @@ func TestDefaultTextSize(t *testing.T) {
 		t.Fatalf("on %s the default is %d, want %d", runtime.GOOS, orig(), want)
 	}
 }
+
+func TestPluginPageSize(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if got := Load().PluginPageSize; got != DefaultPluginPageSize {
+		t.Fatalf("nothing saved: plugins per page %d, want %d", got, DefaultPluginPageSize)
+	}
+	if err := Save(Settings{PluginPageSize: 24}); err != nil || Load().PluginPageSize != 24 {
+		t.Fatalf("plugins per page not kept: %v, %d", err, Load().PluginPageSize)
+	}
+	for _, bad := range []int{1, 13, 120, -1} {
+		if err := Save(Settings{PluginPageSize: bad}); err == nil {
+			t.Fatalf("plugins per page %d accepted", bad)
+		}
+	}
+}

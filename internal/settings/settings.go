@@ -769,6 +769,9 @@ type Settings struct {
 	// drawn, in percent (one of TextSizes): the webviews' own zoom, as a
 	// browser's, so the text and everything around it grow together.
 	TextSize int `json:"textSize,omitempty"`
+	// PluginPageSize is how many cards each list in Plugins › Discover
+	// shows before its next page (one of PluginPageSizes).
+	PluginPageSize int `json:"pluginPageSize,omitempty"`
 	// UIFont and CodeFont are this computer's installed faces. Nil keeps
 	// the platform's stack (or Omarchy's). Sync never replaces them.
 	UIFont   *fonts.Face `json:"uiFont,omitempty"`
@@ -1225,7 +1228,13 @@ var (
 	// TextSizes are TextSize's values, in percent. None is under 100: the
 	// webviews' zoom on Windows and Linux (Wails' SetZoom) goes no lower.
 	TextSizes = []int{100, 110, 125, 150}
+	// PluginPageSizes are PluginPageSize's values.
+	PluginPageSizes = []int{12, 24, 36, 60}
 )
+
+// DefaultPluginPageSize is how many plugin cards a page shows until the
+// user picks another size.
+const DefaultPluginPageSize = 12
 
 // SearchFirst's values: a provider's search first, saved as "", or the
 // search APIs first.
@@ -2146,6 +2155,9 @@ func saveOwn(s Settings, recording, reads bool) error {
 	if !slices.Contains(TextSizes, s.TextSize) {
 		return fmt.Errorf("text size must be one of %v percent, not %d", TextSizes, s.TextSize)
 	}
+	if !slices.Contains(PluginPageSizes, s.PluginPageSize) {
+		return fmt.Errorf("plugins per page must be one of %v, not %d", PluginPageSizes, s.PluginPageSize)
+	}
 	s.OTel.Endpoint = strings.TrimRight(strings.TrimSpace(s.OTel.Endpoint), "/")
 	if err := s.OTel.Check(); err != nil {
 		return err
@@ -2361,6 +2373,9 @@ func (s Settings) normal() Settings {
 	}
 	if s.TextSize == 0 {
 		s.TextSize = DefaultTextSize()
+	}
+	if s.PluginPageSize == 0 {
+		s.PluginPageSize = DefaultPluginPageSize
 	}
 	// one card, as a magpie before TrayUsages kept it; an empty list
 	// sent on purpose (all of them turned off) stays empty

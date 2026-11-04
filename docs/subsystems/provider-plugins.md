@@ -15,6 +15,10 @@ Some built-in subscriptions are deprecated and have community plugins that provi
 
 The `movers` map assembled in `internal/provider/migrate*.go` is the authoritative subscription-to-plugin mapping. Each mover's `min` is the minimum plugin version required by magpie. The list of moved subscriptions in [AGENTS.md](../../AGENTS.md#built-in-subscriptions-that-a-plugin-serves) is a contributor lookup; confirm the mapping in source when changing it.
 
+## The market's pages
+
+Plugins -> Discover paginates each card list independently: Subscriptions, Gateway middleware, Agents, Tools, Pages, Suggested, GitHub, and npm. A pager appears only when a list has more than `settings.PluginPageSize` cards; that setting is `pluginPageSize` in settings.json, defaults to 12, and Settings -> General offers 12, 24, 36, or 60. A search or GitHub filter returns its list to page one, while another section keeps its own page. `section`, `paginate`, `pager`, and `drawGh` in [`plugins.js`](../../internal/gui/assets/plugins.js) draw it; `prefsKeep` in [`app.js`](../../internal/gui/assets/app.js) saves the setting. `plugin-market-pagination.test.cjs` covers the default, paging, filtering, and a changed page size in every GUI language and browser engine.
+
 ## Ownership and runtime paths
 
 `provider.Moved(id)` identifies a subscription whose migration state in `migrations.json` is `plugin`. In `/api/providers`, its row exposes `move.state == "plugin"`; the GUI also receives its id in `onPlugins`.
