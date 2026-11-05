@@ -605,7 +605,9 @@ A plugin can also declare its own switches for its provider (`auth.options`).
 They are listed under **Plugin options** in the provider's editor, an Off/On
 each with the plugin's own words (in the window's language when the
 plugin gives them, `labels` and `descriptions`), and saved with the
-provider. While a switch that leaves models out (`filtersModels`) is on,
+provider. A switch about the whole plugin can say `placement: "top"`, and
+is then listed right under the accounts, above Routing. While a switch that
+leaves models out (`filtersModels`) is on,
 the Models field says the list is filtered. The values are
 kept in `pluginOptions` in `settings.json`, and the plugin reads them as it
 works. Changing one starts nothing by itself. See
@@ -1362,8 +1364,13 @@ call costs. Each is left out when it isn't known (a routing group has no
 ```
 
 An id magpie's own agents use is refused. In the market an agent's entry has
-`"kind": "agent"` (`@magpie-community/agent-<name>`). The full reference is
-on the site's Plugins page, under Agent plugins.
+`"kind": "agent"` (`@magpie-community/agent-<name>`). An agent that needs a
+runtime (a timer, a file watched) keeps its agent file in moejs and adds a
+Bun module as the package's `main`; a package that declares `magpie.agent`
+is an agent in the market and on GitHub's list either way, and its
+Installed row wears Provider only when that module serves a provider
+(plugins#737). The full reference is on the site's Plugins page, under
+Agent plugins.
 
 ### What a model costs
 
